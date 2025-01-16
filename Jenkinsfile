@@ -1,35 +1,35 @@
-pipeline {
-    agent { label 'jappbuildserver1' }	
 
+pipeline {
+
+    agent { label 'slave' }
+	
     tools {
-        // Install the Maven version configured as "M3" and add it to the path.
-        maven "maven_3.6.3"
+        maven "maven 3.8.7"
     }
 
 	environment {	
 		DOCKERHUB_CREDENTIALS=credentials('dockerloginid')
-	} 
-    
+	}
+	
     stages {
-        stage('SCM Checkout') {
+        stage('SCM_Checkout') {
             steps {
-                // Get some code from a GitHub repository
-                git 'https://github.com/LoksaiETA/BankingApp.git'
-                //git 'https://github.com/LoksaiETA/Java-mvn-app2.git'
+                echo 'Perform SCM Checkout'
+				git 'https://github.com/LoksaiETA/devops-java-webapp.git'
             }
-		}
-        stage('Maven Build') {
+        }
+        stage('Application_Build') {
             steps {
-                // Run Maven on a Unix agent.
-                sh "mvn -Dmaven.test.failure.ignore=true clean package"
+                echo 'Perform Maven Build'
+				sh 'mvn clean package'
             }
-		}
-       stage("Docker build"){
+        }
+        stage('Build Docker Image') {
             steps {
 				sh 'docker version'
-				sh "docker build -t loksaieta/bankapp-eta-app:${BUILD_NUMBER} ."
+				sh "docker build -t krushjagdale/loksai-eta-app:${BUILD_NUMBER} ."
 				sh 'docker image list'
-				sh "docker tag loksaieta/bankapp-eta-app:${BUILD_NUMBER} loksaieta/bankapp-eta-app:latest"
+				sh "docker tag krushjagdale/loksai-eta-app:${BUILD_NUMBER} krushjagdale/loksai-eta-app:latest"
             }
         }
 		stage('Login2DockerHub') {
@@ -38,18 +38,17 @@ pipeline {
 				sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
 			}
 		}
-		stage('Push2DockerHub') {
-
+		stage('Publish_to_Docker_Registry') {
 			steps {
-				sh "docker push loksaieta/bankapp-eta-app:latest"
+				sh "docker push krushjagdale/loksai-eta-app:latest"
 			}
 		}
-        stage('Deploy to Kubernetes Dev Environment') {
+		stage('Deploy to Kubernetes') {
             steps {
-		script {
-		sshPublisher(publishers: [sshPublisherDesc(configName: 'Kubernetes', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: 'kubectl apply -f kubernetesdeploy.yaml', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '.', remoteDirectorySDF: false, removePrefix: '', sourceFiles: '*.yaml')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
-		       }
+				script {
+				sshPublisher(publishers: [sshPublisherDesc(configName: 'Kubernetes_Cluster', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: 'kubectl apply -f k8smvndeployment.yaml', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '.', remoteDirectorySDF: false, removePrefix: '', sourceFiles: '*.yaml')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
+			}	
             }
-    	}
+		}
     }
 }
